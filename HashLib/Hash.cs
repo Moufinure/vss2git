@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+using System;
+using System.Security.Cryptography;
+
 namespace Hpdi.HashLib
 {
     /// <summary>
@@ -57,6 +60,112 @@ namespace Hpdi.HashLib
         {
             uint value32 = hash32.Compute(bytes, offset, limit);
             return (ushort)(value32 ^ (value32 >> 16));
+        }
+    }
+
+    public class Crc16Algorithm : HashAlgorithm
+    {
+        private Hash16 hash;
+        private ushort result;
+
+        public Crc16Algorithm(Hash16 hash)
+        {
+            this.hash = hash;
+        }
+
+        public override void Initialize()
+        {
+            result = 0x0;
+        }
+
+        protected override void HashCore(byte[] array, int ibStart, int cbSize)
+        {
+            result = hash.Compute(array, ibStart, cbSize);
+        }
+
+        protected override byte[] HashFinal()
+        {
+            return BitConverter.GetBytes(result);
+        }
+    }
+
+    public class Crc32Algorithm : HashAlgorithm
+    {
+        private Hash32 hash;
+        private uint result;
+
+        public Crc32Algorithm(Hash32 hash)
+        {
+            this.hash = hash;
+        }
+
+        public override void Initialize()
+        {
+        }
+
+        protected override void HashCore(byte[] array, int ibStart, int cbSize)
+        {
+            result = hash.Compute(array, ibStart, cbSize);
+        }
+
+        protected override byte[] HashFinal()
+        {
+            return BitConverter.GetBytes(result);
+        }
+    }
+
+    public class Xor32To16AdapterAlgorithm : HashAlgorithm
+    {
+        private XorHash32To16 hash;
+        private ushort result;
+
+        public Xor32To16AdapterAlgorithm(XorHash32To16 hash)
+        {
+            this.hash = hash;
+        }
+
+        public override void Initialize()
+        {
+        }
+
+        protected override void HashCore(byte[] array, int ibStart, int cbSize)
+        {
+            result = hash.Compute(array, ibStart, cbSize);
+        }
+
+        protected override byte[] HashFinal()
+        {
+            return BitConverter.GetBytes(result);
+        }
+    }
+
+    public class Xor32To16Algorithm : HashAlgorithm
+    {
+        private HashAlgorithm hash;
+        private ushort result;
+
+        public Xor32To16Algorithm(HashAlgorithm hash)
+        {
+            this.hash = hash;
+        }
+
+        public override void Initialize()
+        {
+            hash.Initialize();
+        }
+
+        protected override void HashCore(byte[] array, int ibStart, int cbSize)
+        {
+            if (hash.HashSize > (sizeof(uint) * 8))
+                throw new InvalidOperationException("The hash length is incoherent. Should be 32 bits.");
+
+            uint v = BitConverter.ToUInt32(hash.ComputeHash(array, ibStart, cbSize), 0);
+            result = (ushort)(v ^ (v >> 16));
+        }
+
+        protected override byte[] HashFinal()
+        {
+            return BitConverter.GetBytes(result);
         }
     }
 }

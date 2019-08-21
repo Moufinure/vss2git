@@ -15,6 +15,8 @@
 
 using System;
 using System.Text;
+using System.Security.Cryptography;
+using Nito.KitchenSink.CRC;
 using Hpdi.HashLib;
 
 namespace Hpdi.VssPhysicalLib
@@ -64,17 +66,36 @@ namespace Hpdi.VssPhysicalLib
             return sum;
         }
 
-        private static Hash16 crc16 = new XorHash32To16(new Crc32(Crc32.IEEE));
+        private static HashAlgorithm crc;
+        
+        public static HashAlgorithm Crc
+        {
+            get
+            {
+                if (crc == null)
+                {
+                    CRC32.Definition crcdef = new CRC32.Definition();
+                    crcdef.FinalXorValue = 0x0;
+                    crcdef.Initializer = 0x0;
+                    crcdef.ReverseDataBytes = CRC32.Definition.Default.ReverseDataBytes;
+                    crcdef.ReverseResultBeforeFinalXor = CRC32.Definition.Default.ReverseResultBeforeFinalXor;
+                    crcdef.TruncatedPolynomial = CRC32.Definition.Default.TruncatedPolynomial;
+
+                    crc = new Xor32To16Algorithm(crcdef.Create());
+                }
+                return crc;
+            }
+        }
 
         public ushort Crc16()
         {
-            return crc16.Compute(data, offset, limit);
+            return BitConverter.ToUInt16(Crc.ComputeHash(data, offset, limit), 0);
         }
 
         public ushort Crc16(int bytes)
         {
             CheckRead(bytes);
-            return crc16.Compute(data, offset, offset + bytes);
+            return BitConverter.ToUInt16(Crc.ComputeHash(data, offset, bytes), 0);
         }
 
         public void Skip(int bytes)
@@ -179,7 +200,7 @@ namespace Hpdi.VssPhysicalLib
 
         private void CheckRead(int bytes)
         {
-            if (offset + bytes > limit)
+            if (bytes > Remaining)
             {
                 throw new EndOfBufferException(string.Format(
                     "Attempted read of {0} bytes with only {1} bytes remaining in buffer",
